@@ -411,6 +411,108 @@
     letter-spacing: 0.1em;
   }
 
+
+  /* ── GUESTBOOK ── */
+  .guestbook {
+    background: var(--cream);
+    padding: 120px 72px;
+  }
+
+  .guestbook-form {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 60px;
+    max-width: 600px;
+  }
+
+  .guestbook-form input {
+    font-family: 'Pretendard', sans-serif;
+    font-size: 14px;
+    border: 1px solid rgba(0,0,0,0.15);
+    background: var(--white);
+    padding: 14px 18px;
+    outline: none;
+    border-radius: 2px;
+    color: var(--dark);
+    transition: border-color 0.2s;
+  }
+  .guestbook-form input:focus {
+    border-color: var(--blue);
+  }
+
+  .guestbook-form input.input-name {
+    width: 140px;
+    flex-shrink: 0;
+  }
+
+  .guestbook-form input.input-msg {
+    flex: 1;
+  }
+
+  .guestbook-form button {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    background: var(--blue);
+    color: var(--white);
+    border: none;
+    padding: 14px 24px;
+    cursor: pointer;
+    border-radius: 2px;
+    white-space: nowrap;
+    transition: opacity 0.2s;
+  }
+  .guestbook-form button:hover { opacity: 0.8; }
+
+  .guestbook-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    max-width: 600px;
+  }
+
+  .guestbook-item {
+    padding: 20px 0;
+    border-top: 1px solid rgba(0,0,0,0.08);
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    gap: 24px;
+    align-items: start;
+    animation: fadeUp 0.4s forwards;
+  }
+  .guestbook-item:last-child {
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+  }
+
+  .guestbook-name {
+    font-family: 'DM Serif Display', serif;
+    font-size: 15px;
+    color: var(--blue);
+    font-style: italic;
+  }
+
+  .guestbook-msg {
+    font-size: 14px;
+    line-height: 1.7;
+    color: #444;
+    font-weight: 300;
+  }
+
+  .guestbook-date {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: #aaa;
+    margin-top: 4px;
+    letter-spacing: 0.05em;
+  }
+
+  .guestbook-empty {
+    font-size: 13px;
+    color: #aaa;
+    font-style: italic;
+    padding: 20px 0;
+  }
+
   /* ── RESPONSIVE ── */
   @media (max-width: 900px) {
     .hero { grid-template-columns: 1fr; }
@@ -556,6 +658,20 @@
   </div>
 </section>
 
+
+<!-- GUESTBOOK -->
+<section class="guestbook">
+  <p class="section-label">Guestbook</p>
+  <div class="guestbook-form">
+    <input class="input-name" type="text" id="gb-name" placeholder="이름" maxlength="20" />
+    <input class="input-msg" type="text" id="gb-msg" placeholder="한 줄 남겨주세요 :)" maxlength="100" />
+    <button onclick="addEntry()">남기기</button>
+  </div>
+  <div class="guestbook-list" id="gb-list">
+    <p class="guestbook-empty">아직 방명록이 없어요. 첫 번째로 남겨보세요!</p>
+  </div>
+</section>
+
 <!-- CONTACT -->
 <section class="contact">
   <div>
@@ -574,6 +690,70 @@
 </section>
 
 <script>
+
+  // 방명록 - Supabase 연결
+  const SUPABASE_URL = 'https://mplfkgtwfpyhwyhviiin.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbGZrZ3R3ZnB5aHd5aHZpaWluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NzIxMzEsImV4cCI6MjA5MzA0ODEzMX0.W7tjRpm2RADUCh4mR6dMvBs51hKD2zOsdAOfv8bbQ5E';
+
+  async function fetchEntries() {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/guestbook?order=created_at.desc`, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      }
+    });
+    const data = await res.json();
+    renderEntries(data);
+  }
+
+  function renderEntries(entries) {
+    const list = document.getElementById('gb-list');
+    if (!entries || entries.length === 0) {
+      list.innerHTML = '<p class="guestbook-empty">아직 방명록이 없어요. 첫 번째로 남겨보세요!</p>';
+      return;
+    }
+    list.innerHTML = entries.map(e => {
+      const date = new Date(e.created_at);
+      const dateStr = `${date.getFullYear()}.${String(date.getMonth()+1).padStart(2,'0')}.${String(date.getDate()).padStart(2,'0')}`;
+      return `
+        <div class="guestbook-item">
+          <div>
+            <div class="guestbook-name">${e.name}</div>
+            <div class="guestbook-date">${dateStr}</div>
+          </div>
+          <div class="guestbook-msg">${e.message}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  async function addEntry() {
+    const name = document.getElementById('gb-name').value.trim();
+    const message = document.getElementById('gb-msg').value.trim();
+    if (!name || !message) return;
+
+    await fetch(`${SUPABASE_URL}/rest/v1/guestbook`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({ name, message })
+    });
+
+    document.getElementById('gb-name').value = '';
+    document.getElementById('gb-msg').value = '';
+    fetchEntries();
+  }
+
+  document.getElementById('gb-msg').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addEntry();
+  });
+
+  fetchEntries();
+
   // 마퀴 복제해서 이음매 없애기
   const track = document.getElementById('marquee');
   track.innerHTML += track.innerHTML;
